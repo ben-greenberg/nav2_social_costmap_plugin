@@ -77,6 +77,7 @@ namespace nav2_social_costmap_plugin
     bool use_passing_;
     double sigma_when_still_;
     double tolerance_vel_still_;
+    double cuttoff_angle_scale_;
     double cutoff_, amplitude_, speed_factor_; // sigma_
     double sigma_front_height_, sigma_front_width_, sigma_rear_height_,
         sigma_rear_width_, sigma_right_height_, sigma_right_width_;

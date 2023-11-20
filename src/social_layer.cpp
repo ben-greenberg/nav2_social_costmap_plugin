@@ -65,6 +65,7 @@ namespace nav2_social_costmap_plugin
     declareParameter("use_vel_factor", rclcpp::ParameterValue(true));
     // Factor with which to scale the velocity [1-10]
     declareParameter("speed_factor_multiplier", rclcpp::ParameterValue(5.0));
+    declareParameter("cuttoff_angle_scale", rclcpp::ParameterValue(5.0));
     declareParameter("publish_occgrid", rclcpp::ParameterValue(false));
     get_parameters();
 
@@ -102,6 +103,7 @@ namespace nav2_social_costmap_plugin
     nod->get_parameter(name_ + "." + "use_vel_factor", use_vel_factor_);
     nod->get_parameter(name_ + "." + "speed_factor_multiplier", speed_factor_);
     nod->get_parameter(name_ + "." + "publish_occgrid", publish_occgrid_);
+    nod->get_parameter(name_ + "." + "cuttoff_angle_scale", cuttoff_angle_scale_);
   }
 
   void SocialLayer::peopleCallback(
@@ -367,10 +369,13 @@ namespace nav2_social_costmap_plugin
           if (old_cost == nav2_costmap_2d::NO_INFORMATION)
             continue;
 
-          double a;
+          double a, b, c;
           double a_right = 0.0;
           double x = bx + i * res;
           double y = by + j * res;
+          double ma = atan2(y - cy, x - cx);
+          double diff = angles::shortest_angular_distance(angle, ma);
+
           if (mag < tolerance_vel_still_)
           {
             // PERSON STANDS STILL
@@ -380,8 +385,6 @@ namespace nav2_social_costmap_plugin
           else
           {
 
-            double ma = atan2(y - cy, x - cx);
-            double diff = angles::shortest_angular_distance(angle, ma);
             // RIGHT SIDE
             if (use_passing_)
             {
@@ -394,23 +397,41 @@ namespace nav2_social_costmap_plugin
               }
             }
             // FRONT
-            if (fabs(diff) < M_PI / 2)
+            double factor = 1.0 + mag * speed_factor_;
+            double angle_factor = 1.0 + (mag * cuttoff_angle_scale_);
+            //RCLCPP_INFO(logger_,
+            //        "\n\n*** Value *** %f *** %f ***\n\n",
+            //        cuttoff_angle_scale_,angle_factor);
+            if (fabs(diff) < M_PI / angle_factor)
             {
-              if (use_vel_factor_)
-              {
-                double factor = 1.0 + mag * speed_factor_;
-                a = gaussian(x, y, cx, cy, amplitude_,
-                             sigma_front_height_ * factor, sigma_front_width_,
-                             angle);
-              }
-              else
-                a = gaussian(x, y, cx, cy, amplitude_, sigma_front_height_,
-                             sigma_front_width_, angle);
+              // if (use_vel_factor_)
+              // {
+              //   double factor = 1.0 + mag * speed_factor_;
+              //   a = gaussian(x, y, cx, cy, amplitude_,
+              //                sigma_front_height_ * factor, sigma_front_width_,
+              //                angle);
+              // }
+              // else
+              //   a = gaussian(x, y, cx, cy, amplitude_, sigma_front_height_,
+              //                sigma_front_width_, angle);
+              a = gaussian(x, y, cx, cy, amplitude_, sigma_front_height_*factor,
+                              sigma_front_width_*factor, 0);
+              //a *= (M_PI / 4) - fabs(diff);
+              //a += 1;
+              //b = gaussian(x, y, cx, cy, amplitude_, sigma_front_height_ * factor*2,
+              //sigma_front_width_, angle-(M_PI / 4));
+              //c = gaussian(x, y, cx, cy, amplitude_, sigma_front_height_ * factor*2,
+              //sigma_front_width_, angle+(M_PI / 4));
+              //a = std::max(a,b);
+              //a = std::max(a,c);
+              //a = 200;
+
             }
             else // REAR
               a = gaussian(x, y, cx, cy, amplitude_, sigma_rear_height_,
-                           sigma_rear_width_,
-                           angle); // 0
+                            sigma_rear_width_,
+                            angle); // 0
+              //a = 100;
 
             a = std::max(a, a_right);
           }
@@ -454,7 +475,7 @@ namespace nav2_social_costmap_plugin
 
   double SocialLayer::get_radius(double cutoff, double A, double var)
   {
-    return sqrt(-2 * var * log(cutoff / A));
+    return 100;//sqrt(-2 * var * log(cutoff / A));
   }
 
 } // namespace nav2_social_costmap_plugin
