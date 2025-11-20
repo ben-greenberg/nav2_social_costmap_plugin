@@ -150,15 +150,15 @@ namespace nav2_social_costmap_plugin
       pt.point.y = person.position.y;
       pt.point.z = person.position.z;
       pt.header.frame_id = people_list_.header.frame_id;
-      pt.header.stamp = people_list_.header.stamp;
+      pt.header.stamp.sec = 0;
+      pt.header.stamp.nanosec = 0;
 
-      if (!tf_->canTransform(pt.header.frame_id, global_frame,
-                             tf2_ros::fromMsg(pt.header.stamp)))
-      {
-        RCLCPP_INFO(logger_,
-                    "Social layer can't transform from %s to %s",
-                    pt.header.frame_id.c_str(), global_frame.c_str());
-        return;
+      try {
+          tf_->transform(pt, opt, global_frame); // uses latest available transform
+      } catch (tf2::TransformException &ex) {
+          RCLCPP_WARN(logger_, "Social layer can't transform from %s to %s: %s",
+                      pt.header.frame_id.c_str(), global_frame.c_str(), ex.what());
+          continue; // skip this person
       }
 
       // In general: tf_->transform(in_pose, out_pose, global_frame_,
